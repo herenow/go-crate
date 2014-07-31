@@ -1,7 +1,7 @@
 package crate
 
 import (
-	"net/http"
+    "net/http"
     "net/url"
     "encoding/json"
     "fmt"
@@ -11,8 +11,7 @@ import (
 
 // Crate conn structure
 type CrateConn struct {
-    host string // Host:port
-    url string // Final url
+    Url string // Crate http endpoint url
 }
 
 // Crate json query struct
@@ -33,7 +32,6 @@ func Open(crate_url string) (c CrateConn, err error) {
 
     sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-    c.host = u.Host
     c.url = sanUrl
 
 	return
