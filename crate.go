@@ -32,7 +32,7 @@ func Open(crate_url string) (c CrateConn, err error) {
 
     sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-    c.url = sanUrl
+    c.Url = sanUrl
 
 	return
 }
@@ -43,7 +43,7 @@ func Open(crate_url string) (c CrateConn, err error) {
 // Read: https://crate.io/docs/stable/sql/rest.html for more information about the returned response.
 // Example: crate.Query("SELECT * FROM sys.cluster LIMIT ?", 10)
 func (c *CrateConn) Query(stmt string, args ...interface{}) (string, error) {
-    endpoint := c.url + "/_sql"
+    endpoint := c.Url + "/_sql"
 
     query := &Query{
         Stmt: stmt,
