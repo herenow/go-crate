@@ -3,7 +3,7 @@ go-crate
 
 Golang Sql Driver for Crate Data Storage. (https://crate.io/)
 
-[http://godoc.org/github.com/herenow/go-crate](godoc.org/github.com/herenow/go-crate)
+[http://godoc.org/github.com/herenow/go-crate](http://godoc.org/github.com/herenow/go-crate)
 
 [http://golang.org/pkg/database/sql/](http://golang.org/pkg/database/sql/)
 
