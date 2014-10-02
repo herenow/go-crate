@@ -3,11 +3,11 @@ package crate
 import (
 	"database/sql/driver"
 	"database/sql"
-    "net/http"
-    "encoding/json"
-    "fmt"
-    "io/ioutil"
-    "bytes"
+	"net/http"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"bytes"
 	"errors"
 	"io"
 	"net/url"
@@ -15,42 +15,42 @@ import (
 
 // Crate conn structure
 type CrateDriver struct {
-    Url string // Crate http endpoint url
+	Url string // Crate http endpoint url
 }
 
 // Init a new "Connection" to a Crate Data Storage instance.
 // Note that the connection is not tested until the first query.
 // crate_url example: http://localhost:4200/
 func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
-    u, err := url.Parse(crate_url)
+	u, err := url.Parse(crate_url)
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-    c.Url= sanUrl
+	c.Url= sanUrl
 
 	return c, nil
 }
 
 // Json response struct
 type endpointResponse struct {
-    Error struct {
-        Message string
-        Code int
-    } `json:"error"`
-    Cols []string `json:"cols"`
-    Duration int `json:"duration"`
-    Rowcount int64  `json:"rowcount"`
+	Error struct {
+		Message string
+		Code int
+	} `json:"error"`
+	Cols []string `json:"cols"`
+	Duration int `json:"duration"`
+	Rowcount int64  `json:"rowcount"`
 	Rows [][]interface{} `json:"rows"`
 }
 
 // Crate json query struct
 type endpointQuery struct {
-    Stmt string `json:"stmt"`
-    Args []driver.Value `json:"args,omitempty"`
+	Stmt string `json:"stmt"`
+	Args []driver.Value `json:"args,omitempty"`
 }
 
 // Query the database using prepared statements.
@@ -59,36 +59,36 @@ type endpointQuery struct {
 // "Parameter Substitution" is also supported, read, https://crate.io/docs/stable/sql/rest.html#parameter-substitution
 // This is the internal querie function
 func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse, error) {
-    endpoint := c.Url + "/_sql"
+	endpoint := c.Url + "/_sql"
 
-    query := &endpointQuery{
-        Stmt: stmt,
-    }
+	query := &endpointQuery{
+		Stmt: stmt,
+	}
 
 	if len(args) > 0 {
 		query.Args = args
 	}
 
-    buf, err := json.Marshal(query)
+	buf, err := json.Marshal(query)
 
 	if err != nil {
-        return nil, err
+		return nil, err
 	}
 
-    data := bytes.NewReader(buf)
+	data := bytes.NewReader(buf)
 
-    resp, err := http.Post(endpoint, "application/json", data)
+	resp, err := http.Post(endpoint, "application/json", data)
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    defer resp.Body.Close()
-    body, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
 	// Parse response
 	res := &endpointResponse{}

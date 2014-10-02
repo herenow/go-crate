@@ -42,7 +42,7 @@ func TestQuery(t *testing.T) {
 		var column string
 
 		if err = rows.Scan(&column); err != nil {
-                    t.Error(err)
+			t.Error(err)
 		}
 	}
 }
