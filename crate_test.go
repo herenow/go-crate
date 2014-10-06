@@ -1,8 +1,10 @@
+// NOTE: this tests were written posteriorly
 package crate
 
 import "testing"
 import "database/sql"
-import "log"
+
+//import "log"
 
 func connect() (*sql.DB, error) {
 	return sql.Open("crate", "http://127.0.0.1:4200/")
@@ -50,13 +52,57 @@ func TestQuery(t *testing.T) {
 func TestExec(t *testing.T) {
 	db, _ := connect()
 
-	result, err := db.Exec("create table go_crate (id int, str string)")
+	_, err := db.Exec("create table go_crate (id int, str string)")
 
 	if err != nil {
 		t.Error(err)
 	}
 
-	result, err = db.Exec("drop table go_crate")
+	_, err = db.Exec("drop table go_crate")
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestPreparedStmtQuery(t *testing.T) {
+	db, _ := connect()
+
+	stmt, err := db.Prepare("select 1 from sys.cluster")
+
+	if err != nil {
+		t.Fatalf("Error on db.Prepared()", err)
+	}
+
+	var test int
+	err = stmt.QueryRow().Scan(&test)
+
+	if err != nil {
+		t.Fatalf("Error on stmt.Scan", err)
+	}
+
+	if test != 1 {
+		t.Error("Expected 1 on test, but got", test)
+	}
+}
+
+func TestPreparedStmtExec(t *testing.T) {
+	db, _ := connect()
+
+	stmt, err := db.Prepare("create table go_crate (id int, str string)")
+	stmt2, err2 := db.Prepare("drop table go_crate")
+
+	if err != nil || err2 != nil {
+		t.Fatalf("Error on db.Prepared()", err, err2)
+	}
+
+	_, err = stmt.Exec()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = stmt2.Exec()
 
 	if err != nil {
 		t.Error(err)

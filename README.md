@@ -24,9 +24,15 @@ Not Supported SQL Functions
 ------
 
 Some functions of the `database/sql` package may not be supported, due to a lack of support of Crate or this package.
-`Transactions` are not supported by crate, and some interfaces like `Stmt` have not yet been implemented on this driver.
+`Transactions` are not supported by crate.
 
 
 Notes
 -----
 * Feel free to send in contributions to this package.
+
+
+TODO
+-----
+* Code cleanup
+* Finish checking non-implemented driver methods

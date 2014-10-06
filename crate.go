@@ -1,15 +1,15 @@
 package crate
 
 import (
-	"database/sql/driver"
-	"database/sql"
-	"net/http"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"bytes"
+	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 )
 
@@ -30,7 +30,7 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-	c.Url= sanUrl
+	c.Url = sanUrl
 
 	return c, nil
 }
@@ -39,17 +39,17 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 type endpointResponse struct {
 	Error struct {
 		Message string
-		Code int
+		Code    int
 	} `json:"error"`
-	Cols []string `json:"cols"`
-	Duration int `json:"duration"`
-	Rowcount int64  `json:"rowcount"`
-	Rows [][]interface{} `json:"rows"`
+	Cols     []string        `json:"cols"`
+	Duration int             `json:"duration"`
+	Rowcount int64           `json:"rowcount"`
+	Rows     [][]interface{} `json:"rows"`
 }
 
 // Crate json query struct
 type endpointQuery struct {
-	Stmt string `json:"stmt"`
+	Stmt string         `json:"stmt"`
 	Args []driver.Value `json:"args,omitempty"`
 }
 
@@ -117,8 +117,8 @@ func (c *CrateDriver) Query(stmt string, args []driver.Value) (driver.Rows, erro
 
 	// Rows reader
 	rows := &Rows{
-		columns: res.Cols,
-		values: res.Rows,
+		columns:  res.Cols,
+		values:   res.Rows,
 		rowcount: res.Rowcount,
 	}
 
@@ -154,13 +154,12 @@ func (r *Result) RowsAffected() (int64, error) {
 	return r.affectedRows, nil
 }
 
-
 // Rows reader
 type Rows struct {
-	columns []string
-	values [][]interface{}
+	columns  []string
+	values   [][]interface{}
 	rowcount int64
-	pos int64 // index position on the values array
+	pos      int64 // index position on the values array
 }
 
 // Row columns
@@ -195,15 +194,46 @@ func (c *CrateDriver) Begin() (driver.Tx, error) {
 	return nil, err
 }
 
+// Nothing to close, crate is stateless
 func (c *CrateDriver) Close() error {
 	return nil
 }
 
-func (c *CrateDriver) Prepare(query string) (driver.Stmt, error) {
-	err := errors.New("Prepare() not supported")
-	return nil, err
+// Prepared stmt interface
+type CrateStmt struct {
+	stmt   string // Query stmt
+	driver *CrateDriver
 }
 
+// Driver method that initiates the prepared stmt interface
+func (c *CrateDriver) Prepare(query string) (driver.Stmt, error) {
+	stmt := &CrateStmt{
+		stmt:   query,
+		driver: c,
+	}
+
+	return stmt, nil
+}
+
+// Just pass it to the driver's' default Query() function
+func (s *CrateStmt) Query(args []driver.Value) (driver.Rows, error) {
+	return s.driver.Query(s.stmt, args)
+}
+
+// Just pass it to the driver's default Exec() function
+func (s *CrateStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return s.driver.Exec(s.stmt, args)
+}
+
+// No need to implement close
+func (s *CrateStmt) Close() error {
+	return nil
+}
+
+// The NumInput method is not supported, return -1 so the database/sql packages knows.
+func (s *CrateStmt) NumInput() int {
+	return -1
+}
 
 // Register the driver
 func init() {
