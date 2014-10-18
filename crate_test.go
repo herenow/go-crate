@@ -65,23 +65,19 @@ func TestExec(t *testing.T) {
 	}
 }
 
-func TestPreparedStmtQuery(t *testing.T) {
+func TestQueryRowBigInt(t *testing.T) {
 	db, _ := connect()
 
-	stmt, err := db.Prepare("select 1 from sys.cluster")
-
-	if err != nil {
-		t.Fatalf("Error on db.Prepared()", err)
-	}
+	row := db.QueryRow("select 655300500 from sys.cluster ")
 
 	var test int
-	err = stmt.QueryRow().Scan(&test)
+	err := row.Scan(&test)
 
 	if err != nil {
-		t.Fatalf("Error on stmt.Scan", err)
+		t.Fatalf("Error on QueryRow.Scan", err)
 	}
 
-	if test != 1 {
+	if test != 655300500 {
 		t.Error("Expected 1 on test, but got", test)
 	}
 }

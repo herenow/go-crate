@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 )
@@ -84,15 +83,15 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		return nil, err
-	}
 
 	// Parse response
 	res := &endpointResponse{}
-	err = json.Unmarshal(body, &res)
+	d := json.NewDecoder(resp.Body)
+
+	// We need to set this, or long integers will be interpreted as floats
+	d.UseNumber()
+
+	err = d.Decode(res)
 
 	if err != nil {
 		return nil, err
