@@ -4,7 +4,7 @@ package crate
 import "testing"
 import "database/sql"
 
-//import "log"
+//import "fmt"
 
 func connect() (*sql.DB, error) {
 	return sql.Open("crate", "http://127.0.0.1:4200/")

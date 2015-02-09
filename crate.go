@@ -34,19 +34,21 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	return c, nil
 }
 
-// Json response struct
+// JSON endpoint response struct
+// We expect error to be null or ommited
 type endpointResponse struct {
 	Error struct {
 		Message string
 		Code    int
 	} `json:"error"`
-	Cols     []string        `json:"cols"`
-	Duration int             `json:"duration"`
-	Rowcount int64           `json:"rowcount"`
-	Rows     [][]interface{} `json:"rows"`
+	Cols        []string        `json:"cols"`
+	Duration    int             `json:"duration"`
+	ColumnTypes int             `json:col_types`
+	Rowcount    int64           `json:"rowcount"`
+	Rows        [][]interface{} `json:"rows"`
 }
 
-// Crate json query struct
+// JSON endpoint request struct
 type endpointQuery struct {
 	Stmt string         `json:"stmt"`
 	Args []driver.Value `json:"args,omitempty"`
@@ -58,7 +60,7 @@ type endpointQuery struct {
 // "Parameter Substitution" is also supported, read, https://crate.io/docs/stable/sql/rest.html#parameter-substitution
 // This is the internal querie function
 func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse, error) {
-	endpoint := c.Url + "/_sql"
+	endpoint := c.Url + "/_sql?types"
 
 	query := &endpointQuery{
 		Stmt: stmt,
@@ -99,7 +101,10 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	// Check for db errors
 	if res.Error.Code != 0 {
-		err = errors.New(res.Error.Message)
+		err = &CrateErr{
+			Code:    res.Error.Code,
+			Message: res.Error.Message,
+		}
 		return nil, err
 	}
 
@@ -189,7 +194,7 @@ func (r *Rows) Close() error {
 
 // Yet not supported
 func (c *CrateDriver) Begin() (driver.Tx, error) {
-	err := errors.New("Begin() not supported")
+	err := errors.New("Transactions are not supported by this driver.")
 	return nil, err
 }
 
