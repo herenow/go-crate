@@ -17,8 +17,9 @@ go get github.com/herenow/go-crate
 ```golang
 import "database/sql"
 import _ "github.com/herenow/go-crate"
+
+db, err := sql.Open("crate", "http://localhost:4200/")
 ```
-* The drivers name is `crate`, you will need to specify this when using `sql.Open()`.
 
 
 Not Supported SQL Functions
