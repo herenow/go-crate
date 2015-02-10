@@ -18,6 +18,7 @@ go get github.com/herenow/go-crate
 import "database/sql"
 import _ "github.com/herenow/go-crate"
 ```
+* The drivers name is `crate`, you will need to specify this when using `sql.Open()`.
 
 
 Not Supported SQL Functions
@@ -34,5 +35,4 @@ Notes
 
 TODO
 -----
-* Code cleanup
-* Finish checking non-implemented driver methods
+* Possible type checking when receving data from crate, and convert it to documented Go types.
