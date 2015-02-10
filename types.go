@@ -1,22 +1,22 @@
 package crate
 
-// Crate column types id
+// Crate column types id.
 // As listed in the documentation, see: https://crate.io/docs/stable/sql/rest.html#column-types
 const (
-	TypeNull         = 0
-	TypeNotSupported = 1
-	TypeByte         = 2
-	TypeBoolean      = 3
-	TypeString       = 4
-	TypeIp           = 5
-	TypeDouble       = 6
-	TypeFloat        = 7
-	TypeShort        = 8
-	TypeInteger      = 9
-	TypeLong         = 10
-	TypeTimestamp    = 11
-	TypeObject       = 12
-	TypeGeoPoint     = 13
-	TypeArray        = 100
-	TypeSet          = 101
+	typeNull         = 0
+	typeNotSupported = 1
+	typeByte         = 2
+	typeBoolean      = 3
+	typeString       = 4
+	typeIp           = 5
+	typeDouble       = 6
+	typeFloat        = 7
+	typeShort        = 8
+	typeInteger      = 9
+	typeLong         = 10
+	typeTimestamp    = 11
+	typeObject       = 12
+	typeGeoPoint     = 13
+	typeArray        = 100
+	typeSet          = 101
 )
