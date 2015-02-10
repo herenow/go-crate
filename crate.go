@@ -19,7 +19,6 @@ type CrateDriver struct {
 
 // Init a new "Connection" to a Crate Data Storage instance.
 // Note that the connection is not tested until the first query.
-// crate_url example: http://localhost:4200/
 func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	u, err := url.Parse(crate_url)
 
