@@ -57,7 +57,7 @@ type endpointQuery struct {
 // Read: https://crate.io/docs/stable/sql/rest.html for more information about the returned response.
 // Example: crate.Query("SELECT * FROM sys.cluster LIMIT ?", 10)
 // "Parameter Substitution" is also supported, read, https://crate.io/docs/stable/sql/rest.html#parameter-substitution
-// This is the internal querie function
+// This is the internal query function
 func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse, error) {
 	endpoint := c.Url + "/_sql?types"
 
