@@ -1,8 +1,10 @@
 package blob
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -15,31 +17,41 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	rand.Seed(time.Now().UnixNano())
 }
 
-func TestGetTable(t *testing.T) {
+func TestTableCreation(t *testing.T) {
 	table, err := driver.GetTable("myblobs")
 	if err != nil {
-		t.Error(err.Error())
+		table, err = driver.NewTable("myblobs", 3, 2)
+	}
+	if err != nil {
+		t.Error(err)
 		t.FailNow()
 	}
 	t.Log(table.Name)
-}
 
-func TestNewTable(t *testing.T) {
-	table, err := driver.NewTable("myblobs123", 3, 2)
+	table, err = driver.NewTable("testTable", 3, 2)
 	if err != nil {
 		t.Error(err.Error())
 		t.FailNow()
 	}
 	t.Log(table.Name)
+	if err = table.Drop(); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestUpload(t *testing.T) {
-	data := "asdadfadfasdfasdfafdast"
+	data := strings.Repeat("asdfasdfa", rand.Intn(1000))
 	r := strings.NewReader(data)
 	digest := Sha1Digest(r)
-	r.Seek(0, 0)
+	_, err := r.Seek(0, 0)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	t.Log("data size:", r.Len())
 	table, err := driver.GetTable("myblobs")
 	if err != nil {
 		t.Error(err.Error())
@@ -48,6 +60,51 @@ func TestUpload(t *testing.T) {
 	t.Log(table.Name)
 	_, err = table.Upload(digest, r)
 	if err != nil {
+		t.Error(err.Error())
+		t.Fail()
+	}
+}
+
+func TestUploadDelete(t *testing.T) {
+	data := strings.Repeat("asdfasdfa", rand.Intn(1000))
+	r := strings.NewReader(data)
+	digest := Sha1Digest(r)
+	_, err := r.Seek(0, 0)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	t.Log("data size:", r.Len())
+	table, err := driver.GetTable("myblobs")
+	if err != nil {
+		t.Error(err.Error())
+		t.FailNow()
+	}
+	t.Log(table.Name)
+	record, err := table.Upload(digest, r)
+	if err != nil {
+		t.Error(err.Error())
+		t.Fail()
+	}
+	if err = table.Delete(record.Digest); err != nil {
+		t.Error(err.Error())
+	}
+}
+
+func TestUploadEx(t *testing.T) {
+	table, err := driver.GetTable("myblobs")
+	if err != nil {
+		t.Error(err.Error())
+		t.Fail()
+	}
+	data := strings.Repeat("asdfasdfa", rand.Intn(1000))
+	r := strings.NewReader(data)
+	record, err := table.UploadEx(r)
+	if err != nil {
+		t.Error(err.Error())
+		t.Fail()
+	}
+	if err = table.Delete(record.Digest); err != nil {
 		t.Error(err.Error())
 	}
 }

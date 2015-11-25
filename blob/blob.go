@@ -77,7 +77,7 @@ func (d *Driver) GetTable(name string) (*Table, error) {
 	}, nil
 }
 
-type Entry struct {
+type Record struct {
 	Digest       string
 	LastModified time.Time
 }
@@ -88,7 +88,7 @@ func Sha1Digest(r io.Reader) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (t *Table) Upload(digest string, r io.Reader) (*Entry, error) {
+func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
 	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
 	req, err := http.NewRequest("PUT", url, r)
 	if err != nil {
@@ -98,7 +98,88 @@ func (t *Table) Upload(digest string, r io.Reader) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Entry{
+	return &Record{
 		Digest: digest,
 	}, nil
+}
+
+// UploadEx upload a io.ReadSeeker directly
+func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
+	digest := Sha1Digest(r)
+	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
+	_, err := r.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("PUT", url, r)
+	if err != nil {
+		return nil, err
+	}
+	_, err = t.c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return &Record{
+		Digest: digest,
+	}, nil
+}
+
+func (t *Table) List() (*sql.Rows, error) {
+	query := fmt.Sprintf("select digest, last_modified from blob.%s", t.Name)
+	rows, err := t.drv.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	return rows, err
+}
+
+func (t *Table) Has(digest string) (bool, error) {
+	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := t.c.Do(req)
+	if err != nil {
+		return false, err
+	}
+	if resp.StatusCode == http.StatusOK {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (t *Table) Download(digest string) (io.ReadCloser, error) {
+	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := t.c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
+}
+
+func (t *Table) Delete(digest string) error {
+	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := t.c.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+	return fmt.Errorf("%s", resp.Status)
+}
+
+func (t *Table) Drop() error {
+	sql := fmt.Sprintf("drop blob table %s", t.Name)
+	_, err := t.drv.db.Exec(sql)
+	return err
 }
