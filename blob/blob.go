@@ -88,9 +88,12 @@ func Sha1Digest(r io.Reader) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+func (t *Table) url(digest string) string {
+	return fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
+}
+
 func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
-	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
-	req, err := http.NewRequest("PUT", url, r)
+	req, err := http.NewRequest("PUT", t.url(digest), r)
 	if err != nil {
 		return nil, err
 	}
@@ -106,12 +109,11 @@ func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
 // UploadEx upload a io.ReadSeeker directly
 func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	digest := Sha1Digest(r)
-	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
 	_, err := r.Seek(0, 0)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PUT", url, r)
+	req, err := http.NewRequest("PUT", t.url(digest), r)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +136,7 @@ func (t *Table) List() (*sql.Rows, error) {
 }
 
 func (t *Table) Has(digest string) (bool, error) {
-	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest("HEAD", t.url(digest), nil)
 	if err != nil {
 		return false, err
 	}
@@ -150,8 +151,7 @@ func (t *Table) Has(digest string) (bool, error) {
 }
 
 func (t *Table) Download(digest string) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", t.url(digest), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +163,7 @@ func (t *Table) Download(digest string) (io.ReadCloser, error) {
 }
 
 func (t *Table) Delete(digest string) error {
-	url := fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", t.url(digest), nil)
 	if err != nil {
 		return err
 	}
