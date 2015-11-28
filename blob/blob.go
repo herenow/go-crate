@@ -22,6 +22,7 @@ type Table struct {
 	c    *http.Client
 }
 
+// New creates a new connection with crate server
 func New(crate_url string) (*Driver, error) {
 	db, err := sql.Open("crate", crate_url)
 	if err != nil {
@@ -33,7 +34,9 @@ func New(crate_url string) (*Driver, error) {
 	}, nil
 }
 
-// NewTable create new blob table with name and extra int to specify shards and replicas
+// NewTable create new blob table with name and extra int to specify
+// shards(the second argument) and
+// replicas(by the third int argument)
 func (d *Driver) NewTable(name string, shards ...int) (*Table, error) {
 	sql := fmt.Sprintf(
 		"create blob table %s",
@@ -62,6 +65,8 @@ func (d *Driver) NewTable(name string, shards ...int) (*Table, error) {
 	}, nil
 }
 
+// Get an existing table from the crate server
+// or error when this table does not exist
 func (d *Driver) GetTable(name string) (*Table, error) {
 	_, err := d.db.Exec(
 		"select count(*) from information_schema.tables where table_name = '?' and schema_name = 'blob'",
@@ -82,6 +87,7 @@ type Record struct {
 	LastModified time.Time
 }
 
+// Sha1Digest calculates the sha1 digest for the io.Reader
 func Sha1Digest(r io.Reader) string {
 	h := sha1.New()
 	io.Copy(h, r)
@@ -92,6 +98,7 @@ func (t *Table) url(digest string) string {
 	return fmt.Sprintf("%s/_blobs/%s/%s", t.drv.url, t.Name, digest)
 }
 
+// Upload upload the blob(r) with sha1 hash(digest)
 func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
 	req, err := http.NewRequest("PUT", t.url(digest), r)
 	if err != nil {
@@ -106,7 +113,7 @@ func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
 	}, nil
 }
 
-// UploadEx upload a io.ReadSeeker directly
+// UploadEx upload a io.ReadSeeker, and computes the sha1 hash automatically
 func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	digest := Sha1Digest(r)
 	_, err := r.Seek(0, 0)
@@ -126,6 +133,7 @@ func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	}, nil
 }
 
+// List all blobs inside a blob table
 func (t *Table) List() (*sql.Rows, error) {
 	query := fmt.Sprintf("select digest, last_modified from blob.%s", t.Name)
 	rows, err := t.drv.db.Query(query)
@@ -135,6 +143,7 @@ func (t *Table) List() (*sql.Rows, error) {
 	return rows, err
 }
 
+// Is the blob specified by the digest exist in the table
 func (t *Table) Has(digest string) (bool, error) {
 	req, err := http.NewRequest("HEAD", t.url(digest), nil)
 	if err != nil {
@@ -150,6 +159,7 @@ func (t *Table) Has(digest string) (bool, error) {
 	return false, nil
 }
 
+// Download a blob in a blob table with the specific digest
 func (t *Table) Download(digest string) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", t.url(digest), nil)
 	if err != nil {
@@ -162,6 +172,7 @@ func (t *Table) Download(digest string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
+// Delete a blob in a blob table with the specific digest
 func (t *Table) Delete(digest string) error {
 	req, err := http.NewRequest("DELETE", t.url(digest), nil)
 	if err != nil {
@@ -177,6 +188,7 @@ func (t *Table) Delete(digest string) error {
 	return fmt.Errorf("%s", resp.Status)
 }
 
+// Drop the blob table
 func (t *Table) Drop() error {
 	sql := fmt.Sprintf("drop blob table %s", t.Name)
 	_, err := t.drv.db.Exec(sql)
