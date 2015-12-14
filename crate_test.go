@@ -7,7 +7,7 @@ import "database/sql"
 //import "fmt"
 
 func connect() (*sql.DB, error) {
-	return sql.Open("crate", "http://127.0.0.1:4200/")
+	return sql.Open("crate", "http://debian:4200/")
 }
 
 func TestConnect(t *testing.T) {
