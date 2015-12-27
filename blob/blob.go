@@ -68,11 +68,11 @@ func (d *Driver) NewTable(name string, shards ...int) (*Table, error) {
 // Get an existing table from the crate server
 // or error when this table does not exist
 func (d *Driver) GetTable(name string) (*Table, error) {
-	_, err := d.db.Exec(
-		"select count(*) from information_schema.tables where table_name = '?' and schema_name = 'blob'",
+	row := d.db.QueryRow(
+		"select table_name from information_schema.tables where table_name = ? and schema_name = 'blob'",
 		name,
 	)
-	if err != nil {
+	if err := row.Scan(&name); err != nil {
 		return nil, err
 	}
 	return &Table{
