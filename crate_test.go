@@ -1,13 +1,24 @@
 // NOTE: this tests were written posteriorly
 package crate
 
-import "testing"
-import "database/sql"
+import (
+	"database/sql"
+	"os"
+	"testing"
+)
 
-//import "fmt"
+var CRATE_URL string
+
+func init() {
+	CRATE_URL = os.Getenv("CRATE_URL")
+
+	if CRATE_URL == "" {
+		CRATE_URL = "http://localhost:4200"
+	}
+}
 
 func connect() (*sql.DB, error) {
-	return sql.Open("crate", "http://debian:4200/")
+	return sql.Open("crate", CRATE_URL)
 }
 
 func TestConnect(t *testing.T) {

@@ -1,6 +1,8 @@
 go-crate
 ========
 
+[![CircleCI](https://circleci.com/gh/herenow/go-crate.svg?style=svg)](https://circleci.com/gh/herenow/go-crate)
+
 Golang Sql Driver for Crate Data Storage. (https://crate.io/)
 
 [http://godoc.org/github.com/herenow/go-crate](http://godoc.org/github.com/herenow/go-crate)
