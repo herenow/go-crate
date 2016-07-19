@@ -104,9 +104,12 @@ func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = t.c.Do(req)
+	resp, err := t.c.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != 201 {
+		return nil, fmt.Errorf("Upload failed: %s", resp.Status)
 	}
 	return &Record{
 		Digest: digest,
