@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
+	"time"
 )
 
 // Crate conn structure
@@ -25,6 +27,8 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("%s://%s", u.Scheme, u.Host)
 
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
@@ -220,11 +224,13 @@ func (c *CrateDriver) Prepare(query string) (driver.Stmt, error) {
 
 // Just pass it to the driver's' default Query() function
 func (s *CrateStmt) Query(args []driver.Value) (driver.Rows, error) {
+	fmt.Println("I'm here 226")
 	return s.driver.Query(s.stmt, args)
 }
 
 // Just pass it to the driver's default Exec() function
 func (s *CrateStmt) Exec(args []driver.Value) (driver.Result, error) {
+	fmt.Println("I'm here 231")
 	return s.driver.Exec(s.stmt, args)
 }
 
@@ -236,6 +242,56 @@ func (s *CrateStmt) Close() error {
 // The NumInput method is not supported, return -1 so the database/sql packages knows.
 func (s *CrateStmt) NumInput() int {
 	return -1
+}
+
+func (s *CrateStmt) ColumnConverter(idx int) driver.ValueConverter {
+	fmt.Println("I'm here 245")
+	return &crateTypeConverter{}
+}
+
+type crateTypeConverter struct{}
+
+func IsValue(v interface{}) bool {
+	fmt.Println("I'm here 254")
+	if v == nil {
+		return true
+	}
+	switch v.(type) {
+	case []byte, bool, float64, int64, string, time.Time:
+		return true
+	}
+	return false
+}
+
+func (c crateTypeConverter) ConvertValue(v interface{}) (driver.Value, error) {
+	fmt.Println("I'm here 252")
+
+	dv, err := driver.DefaultParameterConverter.ConvertValue(v)
+
+	fmt.Println("I'm here 258")
+
+	// Try our converter it the default converter failed
+	if err != nil {
+		fmt.Println("I'm here 262")
+		rv := reflect.ValueOf(v)
+
+		fmt.Println(rv)
+		fmt.Println(rv.Kind())
+
+		switch rv.Kind() {
+		case reflect.Ptr:
+			// indirect pointers
+			if rv.IsNil() {
+				return nil, nil
+			}
+			return c.ConvertValue(rv.Elem().Interface())
+		case reflect.Struct, reflect.Map, reflect.Interface:
+			fmt.Println("I'm here 267")
+			return rv.Interface(), nil
+		}
+	}
+
+	return dv, err
 }
 
 // Register the driver

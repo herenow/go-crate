@@ -9,11 +9,16 @@ import (
 
 var CRATE_URL string
 
+type Metadata struct {
+	Runs    int `json:"runs"`
+	Seconds int `json:"seconds"`
+}
+
 func init() {
 	CRATE_URL = os.Getenv("CRATE_URL")
 
 	if CRATE_URL == "" {
-		CRATE_URL = "http://localhost:4200"
+		CRATE_URL = "http://dev-server:4200/"
 	}
 }
 
@@ -104,6 +109,41 @@ func TestPreparedStmtExec(t *testing.T) {
 	}
 
 	_, err = stmt.Exec()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = stmt2.Exec()
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestObjectInsert(t *testing.T) {
+	db, _ := connect()
+
+	metadata := &Metadata{
+		Runs:    98,
+		Seconds: 3478,
+	}
+
+	stmt, err := db.Prepare("create table go_crate (id int, metadata object(dynamic))")
+	stmt2, err2 := db.Prepare("drop table go_crate")
+	stmt3, err3 := db.Prepare("insert into go_crate (id, metadata) values (1, ?)")
+
+	if err != nil || err2 != nil || err3 != nil {
+		t.Fatalf("Error on db.Prepared()", err, err2, err3)
+	}
+
+	_, err = stmt.Exec()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = stmt3.Exec(metadata)
 
 	if err != nil {
 		t.Error(err)
