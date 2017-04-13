@@ -42,7 +42,7 @@ type endpointResponse struct {
 	} `json:"error"`
 	Cols        []string        `json:"cols"`
 	Duration    float64         `json:"duration"`
-	ColumnTypes int             `json:col_types`
+	ColumnTypes []int           `json:"col_types"`
 	Rowcount    int64           `json:"rowcount"`
 	Rows        [][]interface{} `json:"rows"`
 }
