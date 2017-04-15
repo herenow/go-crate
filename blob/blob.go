@@ -69,7 +69,7 @@ func (d *Driver) NewTable(name string, shards ...int) (*Table, error) {
 // or error when this table does not exist
 func (d *Driver) GetTable(name string) (*Table, error) {
 	row := d.db.QueryRow(
-		"select table_name from information_schema.tables where table_name = ? and schema_name = 'blob'",
+		"select table_name from information_schema.tables where table_name = ? and table_schema = 'blob'",
 		name,
 	)
 	if err := row.Scan(&name); err != nil {
