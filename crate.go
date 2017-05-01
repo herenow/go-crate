@@ -192,13 +192,13 @@ func (r *Rows) Close() error {
 }
 
 // Yet not supported
-func (c *CrateDriver) Begin() (driver.Tx, error) {
+func (c CrateDriver) Begin() (driver.Tx, error) {
 	err := errors.New("Transactions are not supported by this driver.")
 	return nil, err
 }
 
 // Nothing to close, crate is stateless
-func (c *CrateDriver) Close() error {
+func (c CrateDriver) Close() error {
 	return nil
 }
 
@@ -209,10 +209,10 @@ type CrateStmt struct {
 }
 
 // Driver method that initiates the prepared stmt interface
-func (c *CrateDriver) Prepare(query string) (driver.Stmt, error) {
+func (c CrateDriver) Prepare(query string) (driver.Stmt, error) {
 	stmt := &CrateStmt{
 		stmt:   query,
-		driver: c,
+		driver: &c,
 	}
 
 	return stmt, nil
