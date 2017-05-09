@@ -10,6 +10,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
+)
+
+const (
+	typeTime = "11"
 )
 
 // Crate conn structure
@@ -65,8 +70,18 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 		Stmt: stmt,
 	}
 
-	if len(args) > 0 {
+	if l:=len(args); l > 0 {
 		query.Args = args
+		//Process each column that needs conversion from time.Time to int64 for Crate
+		for i:= 0; i<l; i++ {
+			if val, ok := args[i].(time.Time) ; ok {
+				if val.IsZero() {
+					query.Args[i] = 0
+				} else {
+					query.Args[i] = val.UnixNano() / 1000000
+				}
+			}
+		}
 	}
 
 	buf, err := json.Marshal(query)
@@ -123,8 +138,13 @@ func (c *CrateDriver) Query(stmt string, args []driver.Value) (driver.Rows, erro
 		columns:  res.Cols,
 		values:   res.Rows,
 		rowcount: res.Rowcount,
+		isTime:   make([]bool, len(res.ColumnTypes)),
 	}
-
+	tcount := len(res.ColumnTypes)
+	for i:=0; i<tcount; i++ {
+		n, ok := res.ColumnTypes[i].(json.Number)
+		rows.isTime[i] = (ok && (n.String() == typeTime)) //Probably faster than getting the int64 value of n ...
+	}
 	return rows, nil
 }
 
@@ -161,6 +181,7 @@ func (r *Result) RowsAffected() (int64, error) {
 type Rows struct {
 	columns  []string
 	values   [][]interface{}
+	isTime   []bool	//Flags columns to convert to time.Time (type 11)
 	rowcount int64
 	pos      int64 // index position on the values array
 }
@@ -175,9 +196,18 @@ func (r *Rows) Next(dest []driver.Value) error {
 	if r.pos >= r.rowcount {
 		return io.EOF
 	}
-
 	for i := range dest {
-		dest[i] = r.values[r.pos][i]
+		if (r.isTime[i] && (r.values[r.pos][i] != nil)) { //If column is flagged as time.Time then convert the int64 value to time.Time
+			if val, ok := r.values[r.pos][i].(json.Number); ok {
+				v , _ := val.Int64()
+				sec := v/int64(1000)
+				dest[i] = time.Unix(sec, (v-sec*int64(1000))*int64(1000000))
+			} else {
+				return errors.New(fmt.Sprintf("Failed to convert column %s=%T to time\n", r.columns[i], r.values[r.pos][i]))
+			}
+		} else {
+			dest[i] = r.values[r.pos][i]
+		}
 	}
 
 	r.pos++
@@ -237,6 +267,8 @@ func (s *CrateStmt) Close() error {
 func (s *CrateStmt) NumInput() int {
 	return -1
 }
+
+
 
 // Register the driver
 func init() {
