@@ -11,16 +11,15 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-)
-
-const (
-	typeTime = "11"
+	"reflect"
 )
 
 // Crate conn structure
 type CrateDriver struct {
 	Url string // Crate http endpoint url
 }
+
+type GeoPoint [2]float64
 
 // Init a new "Connection" to a Crate Data Storage instance.
 // Note that the connection is not tested until the first query.
@@ -58,6 +57,39 @@ type endpointQuery struct {
 	Args []driver.Value `json:"args,omitempty"`
 }
 
+//CER : Convert map, Time & GeoPoint arguments to DB format.
+func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
+	if obj, ok := v.Value.(map[string]interface{}) ; ok {
+			var res= new(bytes.Buffer)
+			res.WriteString("{")
+			count := len(obj)
+			for key, val := range obj {
+				if reflect.ValueOf(val).Kind() == reflect.String {
+					res.WriteString(fmt.Sprintf("\"%s\": \"%v\"", key, val))
+				} else {
+					res.WriteString(fmt.Sprintf("\"%s\": %v", key, val))
+				}
+				count --
+				if count > 0 {
+					res.WriteString(",")
+				}
+			}
+			res.WriteString("}")
+			v.Value = res.String()
+		return nil
+	} else if ts, ok := v.Value.(time.Time) ; ok {
+		if ts.IsZero() {
+			v.Value = 0
+		} else {
+			v.Value = ts.In(time.UTC).UnixNano() / 1000000
+		}
+		return nil
+	} else if _, ok := v.Value.(GeoPoint) ; ok { //No change required for GeoPoint
+		return nil
+	}
+	return driver.ErrSkip
+}
+
 // Query the database using prepared statements.
 // Read: https://crate.io/docs/stable/sql/rest.html for more information about the returned response.
 // Example: crate.Query("SELECT * FROM sys.cluster LIMIT ?", 10)
@@ -72,16 +104,6 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	if l:=len(args); l > 0 {
 		query.Args = args
-		//Process each column that needs conversion from time.Time to int64 for Crate
-		for i:= 0; i<l; i++ {
-			if val, ok := args[i].(time.Time) ; ok {
-				if val.IsZero() {
-					query.Args[i] = 0
-				} else {
-					query.Args[i] = val.UnixNano() / 1000000
-				}
-			}
-		}
 	}
 
 	buf, err := json.Marshal(query)
@@ -138,12 +160,17 @@ func (c *CrateDriver) Query(stmt string, args []driver.Value) (driver.Rows, erro
 		columns:  res.Cols,
 		values:   res.Rows,
 		rowcount: res.Rowcount,
-		isTime:   make([]bool, len(res.ColumnTypes)),
+		isSpecial:   make([]int64, len(res.Cols)),
 	}
 	tcount := len(res.ColumnTypes)
 	for i:=0; i<tcount; i++ {
-		n, ok := res.ColumnTypes[i].(json.Number)
-		rows.isTime[i] = (ok && (n.String() == typeTime)) //Probably faster than getting the int64 value of n ...
+		if n, ok := res.ColumnTypes[i].(json.Number); ok {
+			if t, err := n.Int64(); err == nil {
+				if t == typeTimestamp || t == typeGeoPoint {
+					rows.isSpecial[i] = t
+				}
+			}
+		}
 	}
 	return rows, nil
 }
@@ -160,6 +187,7 @@ func (c *CrateDriver) Exec(stmt string, args []driver.Value) (result driver.Resu
 
 	return result, nil
 }
+
 
 // Result interface
 type Result struct {
@@ -181,7 +209,7 @@ func (r *Result) RowsAffected() (int64, error) {
 type Rows struct {
 	columns  []string
 	values   [][]interface{}
-	isTime   []bool	//Flags columns to convert to time.Time (type 11)
+	isSpecial   []int64	//Flags columns to convert to time.Time (type 11)
 	rowcount int64
 	pos      int64 // index position on the values array
 }
@@ -197,16 +225,29 @@ func (r *Rows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 	for i := range dest {
-		if (r.isTime[i] && (r.values[r.pos][i] != nil)) { //If column is flagged as time.Time then convert the int64 value to time.Time
-			if val, ok := r.values[r.pos][i].(json.Number); ok {
-				v , _ := val.Int64()
-				sec := v/int64(1000)
-				dest[i] = time.Unix(sec, (v-sec*int64(1000))*int64(1000000))
-			} else {
-				return errors.New(fmt.Sprintf("Failed to convert column %s=%T to time\n", r.columns[i], r.values[r.pos][i]))
+		if ((r.isSpecial[i] != 0) && (r.values[r.pos][i] != nil)) {
+			if r.isSpecial[i] == typeTimestamp {
+				if val, ok := r.values[r.pos][i].(json.Number); ok {
+					v, _ := val.Int64()
+					sec := v / int64(1000)
+					dest[i] = time.Unix(sec, (v-sec*int64(1000))*int64(1000000))
+				} else {
+					return fmt.Errorf("Failed to convert column %s=%T to time\n", r.columns[i], r.values[r.pos][i])
+				}
+			} else if r.isSpecial[i] == typeGeoPoint {
+				if psrc, ok := r.values[r.pos][i].([]interface{}) ; ok && (len(psrc) == 2) {
+					var p GeoPoint
+					for i, c := range psrc {
+						if jn, ok := c.(json.Number) ; ok {
+							p[i], _ = jn.Float64()
+						} else { return fmt.Errorf("Failed to convert elem %v of %v to float", c, r.values[r.pos][i])}
+					}
+					dest[i] = &p
+				} else { return fmt.Errorf("Failed to convert to GeoPoint")}
 			}
 		} else {
 			dest[i] = r.values[r.pos][i]
+			//fmt.Printf("Processing column %s : %+v / %s\n", r.columns[i], r.values[r.pos][i], reflect.TypeOf(r.values[r.pos][i]))
 		}
 	}
 
@@ -267,8 +308,6 @@ func (s *CrateStmt) Close() error {
 func (s *CrateStmt) NumInput() int {
 	return -1
 }
-
-
 
 // Register the driver
 func init() {
