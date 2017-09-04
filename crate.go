@@ -19,7 +19,26 @@ type CrateDriver struct {
 	Url string // Crate http endpoint url
 }
 
-type GeoPoint [2]float64
+//GeoPoint represents Crate GeoPoint column
+type GeoPoint struct {
+	Lat float64
+	Lon float64
+}
+
+//Scan : Implements Scanner interface to populate a GeoPoint when the result is an array of 2 floats
+func (gp *GeoPoint) Scan(src interface{}) error {
+	if b, ok := src.([]interface{}) ; ok && len(b) == 2 {
+		var err error
+		if gp.Lon, err = b[0].(json.Number).Float64(); err == nil {
+			if gp.Lat, err = b[1].(json.Number).Float64(); err == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to convert %v to GeoPoint : %v", src, err)
+	}
+	return fmt.Errorf("failed to convert %v to GeoPoint", src)
+}
+
 
 // Init a new "Connection" to a Crate Data Storage instance.
 // Note that the connection is not tested until the first query.
@@ -57,25 +76,27 @@ type endpointQuery struct {
 	Args []driver.Value `json:"args,omitempty"`
 }
 
-//CER : Convert map, Time & GeoPoint arguments to DB format.
+//CheckNamedValue Convert map, time & GeoPoint arguments to DB format.
 func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 	if obj, ok := v.Value.(map[string]interface{}) ; ok {
-			var res= new(bytes.Buffer)
-			res.WriteString("{")
-			count := len(obj)
-			for key, val := range obj {
-				if reflect.ValueOf(val).Kind() == reflect.String {
-					res.WriteString(fmt.Sprintf("\"%s\": \"%v\"", key, val))
-				} else {
-					res.WriteString(fmt.Sprintf("\"%s\": %v", key, val))
-				}
-				count --
-				if count > 0 {
-					res.WriteString(",")
-				}
+		//fmt.Printf("CheckNamedValue for map for %v -> %v\n", v.Name, len(obj))
+		var res= new(bytes.Buffer)
+		res.WriteString("{")
+		count := len(obj)
+		for key, val := range obj {
+			if reflect.ValueOf(val).Kind() == reflect.String {
+				res.WriteString(fmt.Sprintf("\"%s\": \"%v\"", key, val))
+			} else {
+				res.WriteString(fmt.Sprintf("\"%s\": %v", key, val))
 			}
-			res.WriteString("}")
-			v.Value = res.String()
+			count --
+			if count > 0 {
+				res.WriteString(",")
+			}
+		}
+		res.WriteString("}")
+		//fmt.Printf("CheckNamedValue for %v converted to %s\n", v, res.String())
+		v.Value = res.String()
 		return nil
 	} else if ts, ok := v.Value.(time.Time) ; ok {
 		if ts.IsZero() {
@@ -84,9 +105,16 @@ func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 			v.Value = ts.In(time.UTC).UnixNano() / 1000000
 		}
 		return nil
-	} else if _, ok := v.Value.(GeoPoint) ; ok { //No change required for GeoPoint
+	} else if gp, ok := v.Value.(GeoPoint) ; ok {
+		//fmt.Printf("CheckNamedValue for Geopoint (%f,%f) \n", gp.Lon, gp.Lat)
+		nGp := make([]float64, 2)
+		nGp[0] = gp.Lon
+		nGp[1] = gp.Lat
+		v.Value = &nGp
 		return nil
-	}
+	} /*else {
+		fmt.Printf("CheckNamedValue  for %v -> %v\n", v.Name, v.Value)
+	}*/
 	return driver.ErrSkip
 }
 
@@ -232,18 +260,24 @@ func (r *Rows) Next(dest []driver.Value) error {
 					sec := v / int64(1000)
 					dest[i] = time.Unix(sec, (v-sec*int64(1000))*int64(1000000))
 				} else {
-					return fmt.Errorf("Failed to convert column %s=%T to time\n", r.columns[i], r.values[r.pos][i])
+					return fmt.Errorf("failed to convert column %s=%T to time", r.columns[i], r.values[r.pos][i])
 				}
 			} else if r.isSpecial[i] == typeGeoPoint {
 				if psrc, ok := r.values[r.pos][i].([]interface{}) ; ok && (len(psrc) == 2) {
 					var p GeoPoint
-					for i, c := range psrc {
-						if jn, ok := c.(json.Number) ; ok {
-							p[i], _ = jn.Float64()
-						} else { return fmt.Errorf("Failed to convert elem %v of %v to float", c, r.values[r.pos][i])}
+					var err error
+					if p.Lon, err = psrc[0].(json.Number).Float64(); err != nil {
+						return fmt.Errorf("failed to convert to latitude %v", psrc[0])
+					}
+					if p.Lat, err = psrc[1].(json.Number).Float64(); err != nil {
+						return fmt.Errorf("failed to convert to longitude elem %v", psrc[1])
 					}
 					dest[i] = &p
-				} else { return fmt.Errorf("Failed to convert to GeoPoint")}
+				} else if len(psrc) == 0 {
+					dest[i] = GeoPoint{}
+				} else {
+					return fmt.Errorf("failed to convert %v to GeoPoint", r.values[r.pos][i])
+				}
 			}
 		} else {
 			dest[i] = r.values[r.pos][i]
