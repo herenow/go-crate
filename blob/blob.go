@@ -22,6 +22,7 @@ type Table struct {
 	c    *http.Client
 }
 
+// DownloadError represents an error that occurs when downloading a blob.
 type DownloadError struct {
 	Status string
 	StatusCode int
