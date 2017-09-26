@@ -22,6 +22,16 @@ type Table struct {
 	c    *http.Client
 }
 
+type DownloadError struct {
+	Status string
+	StatusCode int
+	Message string
+}
+
+func (e *DownloadError) Error() string {
+	return e.Message
+}
+
 // New creates a new connection with crate server
 func New(crate_url string) (*Driver, error) {
 	db, err := sql.Open("crate", crate_url)
@@ -171,6 +181,9 @@ func (t *Table) Download(digest string) (io.ReadCloser, error) {
 	resp, err := t.c.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return resp.Body, &DownloadError{resp.Status, resp.StatusCode, "problem downloading blob"}
 	}
 	return resp.Body, nil
 }
