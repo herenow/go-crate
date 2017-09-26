@@ -28,6 +28,7 @@ type DownloadError struct {
 	Message string
 }
 
+// Error returns a string representation of the DownloadError.
 func (e *DownloadError) Error() string {
 	return e.Message
 }
