@@ -2,6 +2,7 @@ package crate
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // Crate conn structure
@@ -31,6 +33,14 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	c.Url = sanUrl
 
 	return c, nil
+}
+
+func (c *CrateDriver) Ping(ctx context.Context) error {
+	_, err := c.Exec("SELECT name FROM sys.cluster", nil)
+	if err != nil && strings.Contains(err.Error(), "dial tcp") {
+		return fmt.Errorf("Could not connect to crate at %s", c.Url)
+	}
+	return err
 }
 
 // JSON endpoint response struct
