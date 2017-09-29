@@ -35,6 +35,8 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	return c, nil
 }
 
+// Ping checks if we can connect to the cluster by selecting its name
+// from sys.cluster. If the select fails we return an error.
 func (c *CrateDriver) Ping(ctx context.Context) error {
 	_, err := c.Exec("SELECT name FROM sys.cluster", nil)
 	if err != nil && strings.Contains(err.Error(), "dial tcp") {
