@@ -12,11 +12,24 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+)
+
+var (
+	// DefaultTimeout is the default timeout for CrateDriver if one is
+	// not specified.
+	DefaultTimeout = 10 * time.Second
 )
 
 // Crate conn structure
 type CrateDriver struct {
-	Url string // Crate http endpoint url
+	Url  string // Crate http endpoint url
+	http *http.Client
+	// Timeout is set with a URL query value.
+	// Example:
+	//		sql.Open("crate", "http://127.0.0.1:4200/?timeout=1s")
+	//			Makes the timeout on connections one second.
+	Timeout time.Duration
 }
 
 // Init a new "Connection" to a Crate Data Storage instance.
@@ -31,6 +44,18 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	c.Url = sanUrl
+
+	c.Timeout = DefaultTimeout
+	if u.Query().Get("timeout") != "" {
+		c.Timeout, err = time.ParseDuration(u.Query().Get("timeout"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	c.http = &http.Client{
+		Transport: http.DefaultTransport,
+		Timeout:   c.Timeout,
+	}
 
 	return c, nil
 }
@@ -89,7 +114,7 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	data := bytes.NewReader(buf)
 
-	resp, err := http.Post(endpoint, "application/json", data)
+	resp, err := c.http.Post(endpoint, "application/json", data)
 
 	if err != nil {
 		return nil, err
