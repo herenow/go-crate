@@ -23,7 +23,7 @@ var (
 
 // Crate conn structure
 type CrateDriver struct {
-	Url  string // Crate http endpoint url
+	URL  string // Crate http endpoint url
 	http *http.Client
 	// Timeout is set with a URL query value.
 	// Example:
@@ -43,7 +43,7 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
-	c.Url = sanUrl
+	c.URL = sanUrl
 
 	c.Timeout = DefaultTimeout
 	if u.Query().Get("timeout") != "" {
@@ -65,7 +65,7 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 func (c *CrateDriver) Ping(ctx context.Context) error {
 	_, err := c.Exec("SELECT name FROM sys.cluster", nil)
 	if err != nil && strings.Contains(err.Error(), "dial tcp") {
-		return fmt.Errorf("Could not connect to crate at %s", c.Url)
+		return fmt.Errorf("Could not connect to crate at %s", c.URL)
 	}
 	return err
 }
@@ -96,7 +96,7 @@ type endpointQuery struct {
 // "Parameter Substitution" is also supported, read, https://crate.io/docs/stable/sql/rest.html#parameter-substitution
 // This is the internal query function
 func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse, error) {
-	endpoint := c.Url + "/_sql?types"
+	endpoint := c.URL + "/_sql?types"
 
 	query := &endpointQuery{
 		Stmt: stmt,
