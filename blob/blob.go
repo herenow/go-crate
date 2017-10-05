@@ -94,6 +94,13 @@ func (d *Driver) GetTable(name string) (*Table, error) {
 	}, nil
 }
 
+func (d *Driver) Close() {
+	if d.db != nil {
+		return d.db.Close()
+	}
+	return nil
+}
+
 type Record struct {
 	Digest       string
 	LastModified time.Time
