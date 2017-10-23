@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"reflect"
 )
 
 // Crate conn structure
@@ -25,6 +24,9 @@ type GeoPoint struct {
 	Lon float64
 }
 
+//CrateArray represents an Array column type
+type CrateArray []interface{}
+
 //Scan : Implements Scanner interface to populate a GeoPoint when the result is an array of 2 floats
 func (gp *GeoPoint) Scan(src interface{}) error {
 	if b, ok := src.([]interface{}) ; ok && len(b) == 2 {
@@ -37,6 +39,18 @@ func (gp *GeoPoint) Scan(src interface{}) error {
 		return fmt.Errorf("failed to convert %v to GeoPoint : %v", src, err)
 	}
 	return fmt.Errorf("failed to convert %v to GeoPoint", src)
+}
+
+//Scan : Implements Scanner interface to populate a CrateArray from the incoming data
+func (arr *CrateArray) Scan(src interface{}) error {
+	if srcArr, ok := src.([]interface{}) ; ok  {
+		*arr = make ([]interface{}, len(srcArr))
+		for  i, obj:=range(srcArr) {
+			(*arr)[i] = obj
+		}
+		return nil
+	}
+	return fmt.Errorf("failed to convert %v to CrateArray", src)
 }
 
 
@@ -76,27 +90,14 @@ type endpointQuery struct {
 	Args []driver.Value `json:"args,omitempty"`
 }
 
-//CheckNamedValue Convert map, time & GeoPoint arguments to DB format.
+//CheckNamedValue Convert map, CrateArray, time & GeoPoint arguments to DB format.
 func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 	if obj, ok := v.Value.(map[string]interface{}) ; ok {
-		//fmt.Printf("CheckNamedValue for map for %v -> %v\n", v.Name, len(obj))
-		var res= new(bytes.Buffer)
-		res.WriteString("{")
-		count := len(obj)
-		for key, val := range obj {
-			if reflect.ValueOf(val).Kind() == reflect.String {
-				res.WriteString(fmt.Sprintf("\"%s\": \"%v\"", key, val))
-			} else {
-				res.WriteString(fmt.Sprintf("\"%s\": %v", key, val))
-			}
-			count --
-			if count > 0 {
-				res.WriteString(",")
-			}
+		if len(obj) == 0 {
+			v.Value = "{}"
+		} else {
+			v.Value = obj
 		}
-		res.WriteString("}")
-		//fmt.Printf("CheckNamedValue for %v converted to %s\n", v, res.String())
-		v.Value = res.String()
 		return nil
 	} else if ts, ok := v.Value.(time.Time) ; ok {
 		if ts.IsZero() {
@@ -112,7 +113,11 @@ func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 		nGp[1] = gp.Lat
 		v.Value = &nGp
 		return nil
-	} /*else {
+	} else if arr, ok := v.Value.(CrateArray) ; ok {
+		v.Value = arr
+		return nil
+	}
+	/*else {
 		fmt.Printf("CheckNamedValue  for %v -> %v\n", v.Name, v.Value)
 	}*/
 	return driver.ErrSkip
@@ -139,7 +144,6 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 	if err != nil {
 		return nil, err
 	}
-
 	data := bytes.NewReader(buf)
 
 	resp, err := http.Post(endpoint, "application/json", data)
