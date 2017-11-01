@@ -216,7 +216,7 @@ func (t *Table) Delete(digest string) error {
 
 // Drop the blob table
 func (t *Table) Drop() error {
-	sql := fmt.Sprintf("drop blob table %s", t.Name)
+	sql := fmt.Sprintf("drop blob table \"%s\"", t.Name)
 	_, err := t.drv.db.Exec(sql)
 	return err
 }
