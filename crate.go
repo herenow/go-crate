@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"reflect"
+	"strings"
 )
 
 // Crate conn structure
@@ -90,13 +92,101 @@ type endpointQuery struct {
 	Args []driver.Value `json:"args,omitempty"`
 }
 
+//encodeMap will encode the map stored in obj in json and store it as a string in the buffer buf
+//This is used because one cannot rely on the json encoder because it will format any float with decimal part of 0 as an int
+//If the first value to be stored in a new object's key is an int then all further values will be stored as int
+//and one will loose the decimal part of each value... Our encoder will ensure that a float with a 0 decimal part
+//is encoded as X.0 and not X
+//Note it will not encode maps with keys other than strings and arrays of arrays/slice/map (no need for it in our context)
+func encodeMap(buf *bytes.Buffer, obj map[string]interface{}) error{
+	if len(obj) == 0 {
+		buf.WriteString("{}")
+		return nil
+	}
+	buf.WriteByte('{')
+	first := true
+	for k,v := range obj {
+		if first {
+			first = false
+		} else {
+			buf.WriteByte(',')
+		}
+		buf.WriteString(fmt.Sprintf("\"%s\":", k))
+		fm := "%v"
+		tv := reflect.ValueOf(v)
+		switch tv.Kind() {
+		case reflect.Float64:
+			fallthrough
+		case reflect.Float32:
+			f := tv.Float()
+			i := float64(int64(f))
+			if i == f {
+				fm = "%0.1f"
+			}
+		case reflect.Map:
+			t := reflect.TypeOf(v)
+			if t.Key().Kind() != reflect.String {
+				return fmt.Errorf("cannot encode map with keys of type %v", t)
+			}
+			if err := encodeMap(buf, v.(map[string]interface{})) ; err != nil {
+				return err
+			}
+			continue
+		case reflect.Slice:
+			fallthrough
+		case reflect.Array:
+			m := tv.Len()
+			if m == 0 {
+				buf.WriteString("[]")
+				return nil
+			}
+			tp := reflect.TypeOf(v).Elem().Kind()
+			conv := (tp == reflect.Float64 || tp == reflect.Float32)
+			switch tp {
+			case reflect.Map, reflect.Array, reflect.Slice:
+				return fmt.Errorf("cannot process array of %s", tv.Elem().Kind())
+			case reflect.String:
+				fm = "\"%s\""
+			}
+			buf.WriteByte('[')
+			for i:=0; i<m; i++ {
+				if i>0 {
+					buf.WriteByte(',')
+				}
+				v := tv.Index(i)
+				if conv {
+					fv := v.Float()
+					i := float64(int32(fv))
+					if i == fv {
+						buf.WriteString(fmt.Sprintf("%0.1f", v))
+						continue
+					}
+				}
+				buf.WriteString(fmt.Sprintf("%v", v))
+			}
+			buf.WriteByte(']')
+			continue
+		case reflect.String:
+			fm ="\"%s\""
+			v = strings.Replace(v.(string), "\"", "\\\"", -1)
+		}
+		buf.WriteString(fmt.Sprintf(fm , v))
+	}
+	buf.WriteByte('}')
+	return nil
+}
+
 //CheckNamedValue Convert map, CrateArray, time & GeoPoint arguments to DB format.
 func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 	if obj, ok := v.Value.(map[string]interface{}) ; ok {
 		if len(obj) == 0 {
 			v.Value = "{}"
 		} else {
-			v.Value = obj
+			res := bytes.Buffer{}
+			if err := encodeMap(&res, obj) ; err != nil {
+				return err
+			}
+			v.Value = res.String()
 		}
 		return nil
 	} else if ts, ok := v.Value.(time.Time) ; ok {
