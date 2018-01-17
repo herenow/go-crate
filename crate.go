@@ -158,7 +158,7 @@ func encodeMap(buf *bytes.Buffer, obj map[string]interface{}) error{
 					fv := v.Float()
 					i := float64(int32(fv))
 					if i == fv {
-						buf.WriteString(fmt.Sprintf("%0.1f", v))
+						buf.WriteString(fmt.Sprintf("%0.1f", v.Float()))
 						continue
 					}
 				}
