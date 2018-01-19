@@ -102,12 +102,21 @@ func encodeArray(buf *bytes.Buffer, obj reflect.Value) error {
 	}
 	buf.WriteByte('[')
 	var k reflect.Kind
+	ue := false
 	for i:=0; i<m; i++ {
 		v := obj.Index(i)
 		if i>0 {
 			buf.WriteByte(',')
+			if ue {
+				v = v.Elem()
+			}
 		} else {
 			k = v.Kind()
+			if k == reflect.Interface {
+				ue = true
+				v = v.Elem()
+				k = v.Type().Kind()
+			}
 		}
 		switch k {
 		case reflect.Float32, reflect.Float64:
@@ -163,7 +172,12 @@ func encodeMap(buf *bytes.Buffer, obj reflect.Value) error{
 		buf.WriteString(fmt.Sprintf("\"%s\":", k))
 		fm := "%v"
 		v := obj.MapIndex(k).Elem()
-		switch v.Kind() {
+		vk := v.Kind()
+		if vk == reflect.Interface {
+			v = v.Elem()
+			vk = v.Type().Kind()
+		}
+		switch vk {
 		case reflect.Float64, reflect.Float32:
 			f := v.Float()
 			i := float64(int64(f))
