@@ -92,20 +92,69 @@ type endpointQuery struct {
 	Args []driver.Value `json:"args,omitempty"`
 }
 
+//encodeArray will encode the array represented by obj and store the result in buf
+//It returns an error if obj contains a map with keys other than strings
+func encodeArray(buf *bytes.Buffer, obj reflect.Value) error {
+	m := obj.Len()
+	if m == 0 {
+		buf.WriteString("[]")
+		return nil
+	}
+	buf.WriteByte('[')
+	var k reflect.Kind
+	for i:=0; i<m; i++ {
+		v := obj.Index(i)
+		if i>0 {
+			buf.WriteByte(',')
+		} else {
+			k = v.Kind()
+		}
+		switch k {
+		case reflect.Float32, reflect.Float64:
+			fv := v.Float()
+			i := float64(int32(fv))
+			if i == fv {
+				buf.WriteString(fmt.Sprintf("%0.1f", fv))
+				continue
+			}
+		case reflect.Map:
+			t := reflect.TypeOf(v)
+			if v.Type().Key().Kind() != reflect.String {
+				return fmt.Errorf("cannot encode map with keys of type %v", t)
+			}
+			if err := encodeMap(buf, v) ; err != nil {
+				return err
+			}
+			continue
+		case reflect.Slice, reflect.Array:
+			if err := encodeArray(buf, v); err != nil {
+				return err
+			}
+			continue
+		case reflect.String:
+			buf.WriteString(fmt.Sprintf("%s", strings.Replace(v.String(), "\"", "\\\"", -1)))
+			continue
+		}
+		buf.WriteString(fmt.Sprintf("%v", v))
+	}
+	buf.WriteByte(']')
+	return nil
+}
+
 //encodeMap will encode the map stored in obj in json and store it as a string in the buffer buf
 //This is used because one cannot rely on the json encoder because it will format any float with decimal part of 0 as an int
 //If the first value to be stored in a new object's key is an int then all further values will be stored as int
 //and one will loose the decimal part of each value... Our encoder will ensure that a float with a 0 decimal part
 //is encoded as X.0 and not X
-//Note it will not encode maps with keys other than strings and arrays of arrays/slice/map (no need for it in our context)
-func encodeMap(buf *bytes.Buffer, obj map[string]interface{}) error{
-	if len(obj) == 0 {
+//Note it will not encode maps with keys other than strings
+func encodeMap(buf *bytes.Buffer, obj reflect.Value) error{
+	if obj.Len() == 0 {
 		buf.WriteString("{}")
 		return nil
 	}
 	buf.WriteByte('{')
 	first := true
-	for k,v := range obj {
+	for _, k := range obj.MapKeys() {
 		if first {
 			first = false
 		} else {
@@ -113,62 +162,31 @@ func encodeMap(buf *bytes.Buffer, obj map[string]interface{}) error{
 		}
 		buf.WriteString(fmt.Sprintf("\"%s\":", k))
 		fm := "%v"
-		tv := reflect.ValueOf(v)
-		switch tv.Kind() {
-		case reflect.Float64:
-			fallthrough
-		case reflect.Float32:
-			f := tv.Float()
+		v := obj.MapIndex(k).Elem()
+		switch v.Kind() {
+		case reflect.Float64, reflect.Float32:
+			f := v.Float()
 			i := float64(int64(f))
 			if i == f {
 				fm = "%0.1f"
 			}
 		case reflect.Map:
 			t := reflect.TypeOf(v)
-			if t.Key().Kind() != reflect.String {
+			if v.Type().Key().Kind() != reflect.String {
 				return fmt.Errorf("cannot encode map with keys of type %v", t)
 			}
-			if err := encodeMap(buf, v.(map[string]interface{})) ; err != nil {
+			if err := encodeMap(buf, v) ; err != nil {
 				return err
 			}
 			continue
-		case reflect.Slice:
-			fallthrough
-		case reflect.Array:
-			m := tv.Len()
-			if m == 0 {
-				buf.WriteString("[]")
-				return nil
+		case reflect.Slice, reflect.Array:
+			if err := encodeArray(buf, v) ; err != nil {
+				return err
 			}
-			tp := reflect.TypeOf(v).Elem().Kind()
-			conv := (tp == reflect.Float64 || tp == reflect.Float32)
-			switch tp {
-			case reflect.Map, reflect.Array, reflect.Slice:
-				return fmt.Errorf("cannot process array of %s", tv.Elem().Kind())
-			case reflect.String:
-				fm = "\"%s\""
-			}
-			buf.WriteByte('[')
-			for i:=0; i<m; i++ {
-				if i>0 {
-					buf.WriteByte(',')
-				}
-				v := tv.Index(i)
-				if conv {
-					fv := v.Float()
-					i := float64(int32(fv))
-					if i == fv {
-						buf.WriteString(fmt.Sprintf("%0.1f", v.Float()))
-						continue
-					}
-				}
-				buf.WriteString(fmt.Sprintf("%v", v))
-			}
-			buf.WriteByte(']')
 			continue
 		case reflect.String:
-			fm ="\"%s\""
-			v = strings.Replace(v.(string), "\"", "\\\"", -1)
+			buf.WriteString(fmt.Sprintf("\"%s\"" , strings.Replace(v.String(), "\"", "\\\"", -1)))
+			continue
 		}
 		buf.WriteString(fmt.Sprintf(fm , v))
 	}
@@ -183,7 +201,7 @@ func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 			v.Value = "{}"
 		} else {
 			res := bytes.Buffer{}
-			if err := encodeMap(&res, obj) ; err != nil {
+			if err := encodeMap(&res, reflect.ValueOf(v.Value)) ; err != nil {
 				return err
 			}
 			v.Value = res.String()
