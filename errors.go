@@ -8,6 +8,6 @@ type CrateErr struct {
 }
 
 // Return error message, this is part of the error interface.
-func (e *CrateErr) Error() string {
+func (e CrateErr) Error() string {
 	return e.Message
 }
