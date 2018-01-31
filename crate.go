@@ -13,6 +13,7 @@ import (
 	"time"
 	"reflect"
 	"strings"
+	//"log"
 )
 
 // Crate conn structure
@@ -28,6 +29,9 @@ type GeoPoint struct {
 
 //CrateArray represents an Array column type
 type CrateArray []interface{}
+
+//crateMap used to store any map and force our own MarshalJSON method to be called
+type crateMap map[string]interface{}
 
 //Scan : Implements Scanner interface to populate a GeoPoint when the result is an array of 2 floats
 func (gp *GeoPoint) Scan(src interface{}) error {
@@ -208,18 +212,31 @@ func encodeMap(buf *bytes.Buffer, obj reflect.Value) error{
 	return nil
 }
 
+
+//MarshalJSON custom JSON marshal function to properly marshall maps containing floats with decimal part equals to 0
+func (v crateMap) MarshalJSON() ([]byte, error) {
+	res := bytes.Buffer{}
+	if err := encodeMap(&res, reflect.ValueOf(v)) ; err != nil {
+		return nil, err
+	}
+	//log.Printf("Result Map : %v", res.String())
+	return res.Bytes(), nil
+}
+
+//MarshalJSON custom JSON marshal function to properly handle arrays of floats with decimal part equals to 0
+func (v CrateArray)  MarshalJSON() ([]byte, error) {
+	res := bytes.Buffer{}
+	if err := encodeArray(&res, reflect.ValueOf(v)) ; err != nil {
+		return nil, err
+	}
+	//log.Printf("Result Array : %v", res.String())
+	return res.Bytes(), nil
+}
+
 //CheckNamedValue Convert map, CrateArray, time & GeoPoint arguments to DB format.
 func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 	if obj, ok := v.Value.(map[string]interface{}) ; ok {
-		if len(obj) == 0 {
-			v.Value = "{}"
-		} else {
-			res := bytes.Buffer{}
-			if err := encodeMap(&res, reflect.ValueOf(v.Value)) ; err != nil {
-				return err
-			}
-			v.Value = res.String()
-		}
+		v.Value = crateMap(obj)
 		return nil
 	} else if ts, ok := v.Value.(time.Time) ; ok {
 		if ts.IsZero() {
@@ -235,8 +252,10 @@ func (c *CrateDriver) CheckNamedValue(v *driver.NamedValue) error {
 		nGp[1] = gp.Lat
 		v.Value = &nGp
 		return nil
-	} else if arr, ok := v.Value.(CrateArray) ; ok {
-		v.Value = arr
+	} else if _, ok := v.Value.(CrateArray) ; ok {
+		return nil
+	} else if arr, ok := v.Value.([]interface{}) ; ok {
+		v.Value = CrateArray(arr)
 		return nil
 	}
 	/*else {
