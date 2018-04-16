@@ -120,7 +120,7 @@ func (t *Table) url(digest string) string {
 
 // Upload upload the blob(r) with sha1 hash(digest)
 func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
-	req, err := http.NewRequest("PUT", t.url(digest), r)
+	req, err := t.newRequest("PUT", digest, r)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PUT", t.url(digest), r)
+	req, err := t.newRequest("PUT", digest, r)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (t *Table) List() (*sql.Rows, error) {
 
 // Is the blob specified by the digest exist in the table
 func (t *Table) Has(digest string) (bool, error) {
-	req, err := http.NewRequest("HEAD", t.url(digest), nil)
+	req, err := t.newRequest("HEAD", digest, nil)
 	if err != nil {
 		return false, err
 	}
@@ -184,7 +184,7 @@ func (t *Table) Has(digest string) (bool, error) {
 
 // Download a blob in a blob table with the specific digest
 func (t *Table) Download(digest string) (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", t.url(digest), nil)
+	req, err := t.newRequest("GET", digest, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (t *Table) Download(digest string) (io.ReadCloser, error) {
 
 // Delete a blob in a blob table with the specific digest
 func (t *Table) Delete(digest string) error {
-	req, err := http.NewRequest("DELETE", t.url(digest), nil)
+	req, err := t.newRequest("DELETE", digest, nil)
 	if err != nil {
 		return err
 	}
