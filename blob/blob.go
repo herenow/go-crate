@@ -151,6 +151,9 @@ func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != 201 {
+		return nil, fmt.Errorf("Upload failed: %s", resp.Status)
+	}
 	return &Record{
 		Digest: digest,
 	}, nil
