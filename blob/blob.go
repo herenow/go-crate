@@ -220,3 +220,18 @@ func (t *Table) Drop() error {
 	_, err := t.drv.db.Exec(sql)
 	return err
 }
+
+func (t *Table) newRequest(method, digest string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, t.url(digest), body)
+	if err != nil {
+		return nil ,err
+	}
+	// in some cases where trying to upload or download a blob resulted in non 2xx response,
+	// it seems Crate was not closing the connection (ticket to be opened soon against Crate)
+	// which resulted in strange behavior when requests were made after getting an error.
+	//
+	// For example, if downloading a blob result in a 404, attempting to download another
+	// blob would also result ina  404 even if that second blob absolutely was there.
+	req.Header.Set("Connection", "close")
+	return req, nil
+}
