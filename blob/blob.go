@@ -95,7 +95,7 @@ func (d *Driver) GetTable(name string) (*Table, error) {
 }
 
 // Close the database connection
-func (d *Driver) Close() {
+func (d *Driver) Close() error {
 	if d.db != nil {
 		return d.db.Close()
 	}
