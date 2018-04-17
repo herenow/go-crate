@@ -120,7 +120,7 @@ func (t *Table) url(digest string) string {
 
 // Upload upload the blob(r) with sha1 hash(digest)
 func (t *Table) Upload(digest string, r io.Reader) (*Record, error) {
-	req, err := http.NewRequest("PUT", t.url(digest), r)
+	req, err := t.newRequest("PUT", digest, r)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("PUT", t.url(digest), r)
+	req, err := t.newRequest("PUT", digest, r)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (t *Table) List() (*sql.Rows, error) {
 
 // Is the blob specified by the digest exist in the table
 func (t *Table) Has(digest string) (bool, error) {
-	req, err := http.NewRequest("HEAD", t.url(digest), nil)
+	req, err := t.newRequest("HEAD", digest, nil)
 	if err != nil {
 		return false, err
 	}
@@ -187,7 +187,7 @@ func (t *Table) Has(digest string) (bool, error) {
 
 // Download a blob in a blob table with the specific digest
 func (t *Table) Download(digest string) (io.ReadCloser, error) {
-	req, err := http.NewRequest("GET", t.url(digest), nil)
+	req, err := t.newRequest("GET", digest, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (t *Table) Download(digest string) (io.ReadCloser, error) {
 
 // Delete a blob in a blob table with the specific digest
 func (t *Table) Delete(digest string) error {
-	req, err := http.NewRequest("DELETE", t.url(digest), nil)
+	req, err := t.newRequest("DELETE", digest, nil)
 	if err != nil {
 		return err
 	}
@@ -222,4 +222,19 @@ func (t *Table) Drop() error {
 	sql := fmt.Sprintf("drop blob table \"%s\"", t.Name)
 	_, err := t.drv.db.Exec(sql)
 	return err
+}
+
+func (t *Table) newRequest(method, digest string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, t.url(digest), body)
+	if err != nil {
+		return nil ,err
+	}
+	// in some cases where trying to upload or download a blob resulted in non 2xx response,
+	// it seems Crate was not closing the connection (ticket to be opened soon against Crate)
+	// which resulted in strange behavior when requests were made after getting an error.
+	//
+	// For example, if downloading a blob result in a 404, attempting to download another
+	// blob would also result ina  404 even if that second blob absolutely was there.
+	req.Header.Set("Connection", "close")
+	return req, nil
 }
