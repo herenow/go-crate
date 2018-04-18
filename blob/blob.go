@@ -147,7 +147,7 @@ func (t *Table) UploadEx(r io.ReadSeeker) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = t.c.Do(req)
+	resp, err := t.c.Do(req)
 	if err != nil {
 		return nil, err
 	}
