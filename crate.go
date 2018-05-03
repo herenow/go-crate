@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 )
@@ -107,29 +108,40 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	defer resp.Body.Close()
 
-	// Parse response
-	res := &endpointResponse{}
-	d := json.NewDecoder(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		// Parse response
+		res := &endpointResponse{}
+		d := json.NewDecoder(resp.Body)
 
-	// We need to set this, or long integers will be interpreted as floats
-	d.UseNumber()
+		// We need to set this, or long integers will be interpreted as floats
+		d.UseNumber()
 
-	err = d.Decode(res)
+		err = d.Decode(res)
 
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for db errors
-	if res.Error.Code != 0 {
-		err = &CrateErr{
-			Code:    res.Error.Code,
-			Message: res.Error.Message,
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
-	}
 
-	return res, nil
+		// Check for db errors
+		if res.Error.Code != 0 {
+			err = &CrateErr{
+				Code:    res.Error.Code,
+				Message: res.Error.Message,
+			}
+			return nil, err
+		}
+
+		return res, nil
+	} else {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		msg := fmt.Sprintf("Invalid http status code %d, body: %s", resp.StatusCode, string(body))
+
+		return nil, errors.New(msg)
+	}
 }
 
 // Queries the database
