@@ -8,13 +8,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 )
 
 // Crate conn structure
 type CrateDriver struct {
-	Url string // Crate http endpoint url
+	Url        string // Crate http endpoint url
+	username   string
+	password   string
+	httpClient *http.Client
 }
 
 // Init a new "Connection" to a Crate Data Storage instance.
@@ -29,6 +33,15 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	c.Url = sanUrl
+	c.httpClient = &http.Client{}
+
+	if u.User != nil {
+		username := u.User.Username()
+		password, _ := u.User.Password()
+
+		c.username = username
+		c.password = password
+	}
 
 	return c, nil
 }
@@ -77,37 +90,58 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	data := bytes.NewReader(buf)
 
-	resp, err := http.Post(endpoint, "application/json", data)
+	req, err := http.NewRequest("POST", endpoint, data)
+	if err != nil {
+		return nil, err
+	}
 
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	defer resp.Body.Close()
 
-	// Parse response
-	res := &endpointResponse{}
-	d := json.NewDecoder(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		// Parse response
+		res := &endpointResponse{}
+		d := json.NewDecoder(resp.Body)
 
-	// We need to set this, or long integers will be interpreted as floats
-	d.UseNumber()
+		// We need to set this, or long integers will be interpreted as floats
+		d.UseNumber()
 
-	err = d.Decode(res)
+		err = d.Decode(res)
 
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for db errors
-	if res.Error.Code != 0 {
-		err = &CrateErr{
-			Code:    res.Error.Code,
-			Message: res.Error.Message,
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
-	}
 
-	return res, nil
+		// Check for db errors
+		if res.Error.Code != 0 {
+			err = &CrateErr{
+				Code:    res.Error.Code,
+				Message: res.Error.Message,
+			}
+			return nil, err
+		}
+
+		return res, nil
+	} else {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		msg := fmt.Sprintf("Invalid http status code %d, body: %s", resp.StatusCode, string(body))
+
+		return nil, errors.New(msg)
+	}
 }
 
 // Queries the database

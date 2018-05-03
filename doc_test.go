@@ -15,6 +15,14 @@ func ExampleCrateDrive_Open() {
 	}
 }
 
+func ExampleCrateDrive_OpenUsernamePassword() {
+	_, err := sql.Open("crate", "http://username:password@localhost:4200")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func ExampleCrateDriver_Query() {
 	db, err := sql.Open("crate", "http://localhost:4200")
 
