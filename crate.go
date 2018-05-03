@@ -14,7 +14,10 @@ import (
 
 // Crate conn structure
 type CrateDriver struct {
-	Url string // Crate http endpoint url
+	Url        string // Crate http endpoint url
+	username   string
+	password   string
+	httpClient *http.Client
 }
 
 // Init a new "Connection" to a Crate Data Storage instance.
@@ -29,6 +32,15 @@ func (c *CrateDriver) Open(crate_url string) (driver.Conn, error) {
 	sanUrl := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	c.Url = sanUrl
+	c.httpClient = &http.Client{}
+
+	if u.User != nil {
+		username := u.User.Username()
+		password, _ := u.User.Password()
+
+		c.username = username
+		c.password = password
+	}
 
 	return c, nil
 }
@@ -77,8 +89,18 @@ func (c *CrateDriver) query(stmt string, args []driver.Value) (*endpointResponse
 
 	data := bytes.NewReader(buf)
 
-	resp, err := http.Post(endpoint, "application/json", data)
+	req, err := http.NewRequest("POST", endpoint, data)
+	if err != nil {
+		return nil, err
+	}
 
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
