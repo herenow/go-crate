@@ -130,6 +130,10 @@ func encodeArray(buf *bytes.Buffer, obj reflect.Value) error {
 				buf.WriteString(fmt.Sprintf("%0.1f", fv))
 				continue
 			}
+			//Prevents rounding errors seen with floats like 0.01*41 which is 0.41000000000000003 ...
+			//See https://floating-point-gui.de/
+			buf.WriteString(fmt.Sprintf("%0.6f", fv))
+			continue
 		case reflect.Map:
 			t := reflect.TypeOf(v)
 			if v.Type().Key().Kind() != reflect.String {
