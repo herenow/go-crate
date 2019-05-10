@@ -190,8 +190,13 @@ func encodeMap(buf *bytes.Buffer, obj reflect.Value) error{
 			f := v.Float()
 			i := float64(int64(f))
 			if i == f {
-				fm = "%0.1f"
+				buf.WriteString(fmt.Sprintf("%0.1f", f))
+				continue
 			}
+			//Prevents rounding errors seen with floats like 0.01*41 which is 0.41000000000000003 ...
+			//See https://floating-point-gui.de/
+			buf.WriteString(fmt.Sprintf("%0.6f", f))
+			continue
 		case reflect.Map:
 			t := reflect.TypeOf(v)
 			if v.Type().Key().Kind() != reflect.String {
