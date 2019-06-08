@@ -85,7 +85,7 @@ func TestQueryRowBigInt(t *testing.T) {
 	err := row.Scan(&test)
 
 	if err != nil {
-		t.Fatalf("Error on QueryRow.Scan", err)
+		t.Fatalf("Error on QueryRow.Scan - %v", err)
 	}
 
 	if test != 655300500 {
@@ -100,7 +100,7 @@ func TestPreparedStmtExec(t *testing.T) {
 	stmt2, err2 := db.Prepare("drop table go_crate")
 
 	if err != nil || err2 != nil {
-		t.Fatalf("Error on db.Prepared()", err, err2)
+		t.Fatalf("Error on db.Prepared() - %v - %v", err, err2)
 	}
 
 	_, err = stmt.Exec()
