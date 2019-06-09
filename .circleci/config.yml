@@ -1,0 +1,35 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.12.5
+
+    working_directory: /go/src/github.com/herenow/go-crate
+
+    environment:
+      CRATE_URL: "http://localhost:4200/"
+      JAVA_HOME: "/usr/lib/jvm/java-11-openjdk"
+
+    steps:
+      - checkout
+      - run:
+          command: |
+            sudo apt-get install default-jdk
+            mkdir ~/crate
+            wget -c https://cdn.crate.io/downloads/releases/crate-3.3.3.tar.gz -P ~/crate
+            tar -xzvf ~/crate/crate-3.3.3.tar.gz -C ~/crate
+            mv -v ~/crate/crate-3.3.3/* ~/crate
+            rm -r ~/crate/crate-3.3.3
+      - run: go get -v -t -d ./...
+      - run:
+          command: |
+            set -e
+            ~/crate/bin/crate & disown -a
+            sleep 25
+            go test -v -race ./...
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build

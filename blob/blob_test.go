@@ -23,7 +23,7 @@ func init() {
 func TestTableCreation(t *testing.T) {
 	table, err := driver.GetTable("myblobs")
 	if err != nil {
-		table, err = driver.NewTable("myblobs", 1, 1)
+		table, err = driver.NewTable("myblobs", 3, 0)
 	}
 	if err != nil {
 		t.Error(err)
@@ -31,7 +31,7 @@ func TestTableCreation(t *testing.T) {
 	}
 	t.Log(table.Name)
 
-	table, err = driver.NewTable("testTable", 1, 1)
+	table, err = driver.NewTable("testtable", 3, 0)
 	if err != nil {
 		t.Error(err.Error())
 		t.FailNow()
