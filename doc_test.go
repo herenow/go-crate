@@ -4,36 +4,36 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/herenow/go-crate"
-	"log"
+	"testing"
 )
 
-func ExampleCrateDrive_Open() {
+func TestExampleCrateDrive_Open(t *testing.T) {
 	_, err := sql.Open("crate", "http://localhost:4200")
 
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 }
 
-func ExampleCrateDrive_OpenUsernamePassword() {
+func TestExampleCrateDrive_OpenUsernamePassword(t *testing.T) {
 	_, err := sql.Open("crate", "http://username:password@localhost:4200")
 
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 }
 
-func ExampleCrateDriver_Query() {
+func TestExampleCrateDriver_Query(t *testing.T) {
 	db, err := sql.Open("crate", "http://localhost:4200")
 
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	rows, err := db.Query("SELECT name FROM sys.cluster")
 
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	defer rows.Close()
 
@@ -41,12 +41,12 @@ func ExampleCrateDriver_Query() {
 		var name string
 
 		if err := rows.Scan(&name); err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 		fmt.Printf("%s\n", name)
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 }
