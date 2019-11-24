@@ -154,9 +154,10 @@ func (c *CrateDriver) Query(stmt string, args []driver.Value) (driver.Rows, erro
 
 	// Rows reader
 	rows := &Rows{
-		columns:  res.Cols,
-		values:   res.Rows,
-		rowcount: res.Rowcount,
+		columns:  		res.Cols,
+		columnTypes: 	res.ColumnTypes,
+		values:   		res.Rows,
+		rowcount: 		res.Rowcount,
 	}
 
 	return rows, nil
@@ -193,10 +194,11 @@ func (r *Result) RowsAffected() (int64, error) {
 
 // Rows reader
 type Rows struct {
-	columns  []string
-	values   [][]interface{}
-	rowcount int64
-	pos      int64 // index position on the values array
+	columns  	[]string
+	columnTypes []interface{}
+	values   	[][]interface{}
+	rowcount 	int64
+	pos      	int64 // index position on the values array
 }
 
 // Row columns
@@ -223,6 +225,34 @@ func (r *Rows) Next(dest []driver.Value) error {
 func (r *Rows) Close() error {
 	r.pos = r.rowcount // Set to end of list
 	return nil
+}
+
+var typeMap = map[int]string{
+	2: "byte",
+	3: "boolean",
+	4: "string",
+	5: "ip",
+	6: "double",
+	7: "float",
+	8: "short",
+	9: "integer",
+	10: "long",
+	11: "timestamp",
+	12: "object",
+	13: "geo_point",
+	14: "geo_shape",
+}
+
+func (r *Rows) ColumnTypeDatabaseTypeName(index int) string {
+	switch r.columnTypes[index].(type) {
+	case []interface{}:
+		x := r.columnTypes[index].([]interface{})
+		val, _ := x[1].(json.Number).Int64()
+		return fmt.Sprintf("array(%s)", typeMap[int(val)])
+	default:
+		val, _ := r.columnTypes[index].(json.Number).Int64()
+		return typeMap[int(val)]
+	}
 }
 
 // Yet not supported
