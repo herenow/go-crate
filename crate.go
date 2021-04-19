@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	//"log"
 )
 
 // Crate conn structure
@@ -148,7 +147,7 @@ func encodeArray(buf *bytes.Buffer, obj reflect.Value) error {
 			}
 			continue
 		case reflect.String:
-			buf.WriteString(fmt.Sprintf("%s", strings.Replace(v.String(), "\"", "\\\"", -1)))
+			buf.WriteString(fmt.Sprintf("\"%s\"", strings.Replace(v.String(), "\"", "\\\"", -1)))
 			continue
 		}
 		buf.WriteString(fmt.Sprintf("%v", v))
